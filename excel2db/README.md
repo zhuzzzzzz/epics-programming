@@ -6,4 +6,5 @@
 - 绿色部分涉及PV部分, 由专业组按填写 
 - 黄色部分涉及EPICS modbus配置, 由控制组相关人员填写 
 - 参考example表进行填写
+- 执行python excel2db4modbus.py modbus2db.xlsx生成文件
 
