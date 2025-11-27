@@ -150,7 +150,7 @@ class ModbusRecord:
         if not self.slave_id and not isinstance(self.slave_id, int):
             print(f'错误: 表格第{self.line_number}行未配置正确的PLC设备从站号')
             exit(1)
-        if not self.memory_address:
+        if not isinstance(self.memory_address, int) or self.memory_address < 0:
             print(f'错误: 表格第{self.line_number}行未配置正确的PV对应的设备地址')
             exit(1)
         if not self.memory_offset and not isinstance(self.memory_offset, int):
@@ -351,7 +351,7 @@ def handle_excel_list(excel_list):
                 pv_temp.modbus_funcode = excel_list[j][i]
             elif 'Address' in pv_title[i]:
                 memory_address = excel_list[j][i]
-                if not memory_address:
+                if not isinstance(memory_address, int) or memory_address < 0:
                     print(f'错误: 表格第{j}行未配置PV地址')
                     exit(1)
                 pv_temp.memory_address = memory_address
