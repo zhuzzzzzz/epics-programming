@@ -304,6 +304,12 @@ def get_excel_list(file_path='./modbus2db.xlsx', sheet_name='WorkArea', verbosit
             for j in range(merged_cell.bounds[1] - 1, merged_cell.bounds[3]):
                 excel_list[j][i] = merged_value
 
+    excel_list_not_empty_row = []
+    for line in excel_list:
+        if any(line):
+            excel_list_not_empty_row.append(line)
+    excel_list = excel_list_not_empty_row
+
     if verbosity >= 2:
         for line_list in excel_list:
             for item in line_list:
@@ -328,6 +334,8 @@ def handle_excel_list(excel_list):
         device_info = None
         #
         for i in range(len(pv_title)):
+            if not pv_title[i]:
+                continue
             # print(type(excel_list[j][i]))
             if 'PLC名称' in pv_title[i]:
                 device_name = excel_list[j][i]
