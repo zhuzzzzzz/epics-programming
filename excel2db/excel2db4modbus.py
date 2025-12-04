@@ -289,7 +289,7 @@ class ModbusRecord:
 
 
 # return the EXCEL table contents, merged_cells are handled.
-def get_excel_list(file_path='./modbus2db.xlsx', sheet_name='WorkArea', verbosity=0):
+def get_excel_list(file_path='./Modbus2db.xlsx', sheet_name='WorkArea', verbosity=0):
     workbook = load_workbook(file_path)
     sheet_loaded = workbook[sheet_name]
     # print(sheet_loaded.calculate_dimension())
