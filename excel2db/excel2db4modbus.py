@@ -150,9 +150,9 @@ class ModbusRecord:
         if not self.slave_id and not isinstance(self.slave_id, int):
             print(f'错误: 表格第{self.line_number}行未配置正确的PLC设备从站号')
             exit(1)
-        if not isinstance(self.memory_address, int) or self.memory_address < 0:
-            print(f'错误: 表格第{self.line_number}行未配置正确的PV对应的设备地址')
-            exit(1)
+        # if not isinstance(self.memory_address, int) or self.memory_address < 0:
+        #     print(f'错误: 表格第{self.line_number}行未配置正确的PV对应的设备地址')
+        #     exit(1)
         if not self.memory_offset and not isinstance(self.memory_offset, int):
             print(f'错误: 表格第{self.line_number}行未配置正确的PV对应的设备地址偏移量')
             exit(1)
@@ -326,8 +326,9 @@ def handle_excel_list(excel_list):
     pv_title = excel_list[0]
     device_pvs = {}
     for j in range(1, len(excel_list)):
+        line_number = j + 1
         pv_temp = ModbusRecord()
-        pv_temp.line_number = j
+        pv_temp.line_number = line_number
         #
         device_name = None
         device_address = None
@@ -341,56 +342,56 @@ def handle_excel_list(excel_list):
                 device_name = excel_list[j][i]
                 if not device_name:
                     device_name = 'UnknownDevice'
-                    print(f'警告: 表格第{j}行未配置PLC设备名称, 将使用默认名称UnknownDevice')
+                    print(f'警告: 表格第{line_number}行未配置PLC设备名称, 将使用默认名称UnknownDevice')
                 pv_temp.device = device_name
             elif 'IP:Port' in pv_title[i]:
                 device_address = excel_list[j][i]
                 if not device_address:
-                    print(f'错误: 表格第{j}行未配置PLC设备地址')
+                    print(f'错误: 表格第{line_number}行未配置PLC设备地址')
                     exit(1)
             elif 'PLC信息' in pv_title[i]:
                 device_info = excel_list[j][i]
             elif 'PLC从站号' in pv_title[i]:
                 slave_id = excel_list[j][i]
                 if not isinstance(slave_id, int):
-                    print(f'警告: 表格第{j}行未配置正确的PLC设备从站号, 将使用默认从站号0')
+                    print(f'警告: 表格第{line_number}行未配置正确的PLC设备从站号, 将使用默认从站号0')
                 pv_temp.slave_id = slave_id
             elif 'Modbus功能码' in pv_title[i]:
                 pv_temp.modbus_funcode = excel_list[j][i]
             elif 'Address' in pv_title[i]:
                 memory_address = excel_list[j][i]
-                if not isinstance(memory_address, int) or memory_address < 0:
-                    print(f'错误: 表格第{j}行未配置PV地址')
+                if not memory_address:
+                    print(f'错误: 表格第{line_number}行未配置PV地址')
                     exit(1)
                 pv_temp.memory_address = memory_address
             elif 'Offset' in pv_title[i]:
                 memory_offset = excel_list[j][i]
                 if not isinstance(memory_offset, int):
-                    print(f'错误: 表格第{j}行未配置PV地址偏移, 无偏移请设置为0')
+                    print(f'错误: 表格第{line_number}行未配置PV地址偏移, 无偏移请设置为0')
                     exit(1)
                 pv_temp.memory_offset = memory_offset
             elif '数据操作' in pv_title[i]:
                 device_access = excel_list[j][i]
                 if device_access.lower() not in ('r', 'w', 'rw'):
-                    print(f'错误: 表格第{j}行未配置正确的PV数据操作类型')
+                    print(f'错误: 表格第{line_number}行未配置正确的PV数据操作类型')
                     exit(1)
                 pv_temp.device_access = device_access
             elif '数据长度' in pv_title[i]:
                 data_length = excel_list[j][i]
                 if not isinstance(data_length, int) or data_length <= 0:
-                    print(f'错误: 表格第{j}行未配置正确的PV数据长度')
+                    print(f'错误: 表格第{line_number}行未配置正确的PV数据长度')
                     exit(1)
                 pv_temp.data_length = data_length
             elif 'PV前缀' in pv_title[i]:
                 name_prefix = excel_list[j][i]
                 if not name_prefix:
-                    print(f'错误: 表格第{j}行未配置PV名称前缀')
+                    print(f'错误: 表格第{line_number}行未配置PV名称前缀')
                     exit(1)
                 pv_temp.name_prefix = name_prefix
             elif 'PV后缀' in pv_title[i]:
                 name = excel_list[j][i]
                 if not name:
-                    print(f'错误: 表格第{j}行未配置PV名称后缀')
+                    print(f'错误: 表格第{line_number}行未配置PV名称后缀')
                     exit(1)
                 pv_temp.name = name
             elif '更新周期' in pv_title[i]:
@@ -404,7 +405,7 @@ def handle_excel_list(excel_list):
             elif '数据类型' in pv_title[i]:
                 drvUser_prefix = excel_list[j][i]
                 if not drvUser_prefix:
-                    print(f'错误: 表格第{j}行未配置PV数据类型')
+                    print(f'错误: 表格第{line_number}行未配置PV数据类型')
                     exit(1)
                 pv_temp.drvUser_prefix = drvUser_prefix
             elif '数据格式' in pv_title[i]:
@@ -447,21 +448,12 @@ if __name__ == '__main__':
     device_pv_list_dict = None
     if len(sys.argv) == 2:
         device_pv_list_dict = handle_excel_list(get_excel_list(file_path=sys.argv[1], verbosity=debug_level))
-        for dev in device_pv_list_dict:
-            print(dev)
-            for item in device_pv_list_dict[dev]:
-                print(item)
-            else:
-                print()
     else:
         device_pv_list_dict = handle_excel_list(
             get_excel_list(file_path=sys.argv[1], sheet_name=sys.argv[2], verbosity=debug_level))
     #
     object_path = os.path.join(os.getcwd(), 'res')
-    try:
-        os.makedirs(object_path)
-    except Exception:
-        pass
+    os.makedirs(object_path, exist_ok=True)
     for dev in device_pv_list_dict:
         file_name = dev
         object_db_file = os.path.join(object_path, f'{file_name}.db')
@@ -471,8 +463,9 @@ if __name__ == '__main__':
         lines_for_cmd = []
         #
         for device_item in DeviceRegistered.values():
-            lines_for_cmd.append(f'drvAsynIPPortConfigure("{device_item.name}", "{device_item.address}", 0, 0, 1)\n')
-            lines_for_cmd.append(f'modbusInterposeConfig("{device_item.name}", 0, 2000, 0)\n')
+            if device_item.name == dev:
+                lines_for_cmd.append(f'drvAsynIPPortConfigure("{device_item.name}", "{device_item.address}", 0, 0, 1)\n')
+                lines_for_cmd.append(f'modbusInterposeConfig("{device_item.name}", 0, 2000, 0)\n')
         else:
             lines_for_cmd.append('\n')
         #
