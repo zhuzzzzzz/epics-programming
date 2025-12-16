@@ -360,7 +360,7 @@ def handle_excel_list(excel_list):
                 pv_temp.modbus_funcode = excel_list[j][i]
             elif 'Address' in pv_title[i]:
                 memory_address = excel_list[j][i]
-                if not memory_address:
+                if not memory_address or not isinstance(memory_address, int):
                     print(f'错误: 表格第{line_number}行未配置PV地址')
                     exit(1)
                 pv_temp.memory_address = memory_address
