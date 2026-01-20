@@ -360,7 +360,7 @@ def handle_excel_list(excel_list):
                 pv_temp.modbus_funcode = excel_list[j][i]
             elif 'Address' in pv_title[i]:
                 memory_address = excel_list[j][i]
-                if not memory_address or not isinstance(memory_address, int):
+                if not memory_address:
                     print(f'错误: 表格第{line_number}行未配置PV地址')
                     exit(1)
                 pv_temp.memory_address = memory_address
@@ -474,7 +474,7 @@ if __name__ == '__main__':
             pv_item.gen_config_line()
             lines_for_db.extend(pv_item.gen_db_lines())
         else:
-            with open(object_db_file, 'w') as f:
+            with open(object_db_file, 'w', encoding="utf-8") as f:
                 f.writelines(lines_for_db)
                 print(f'写入db文件: "{object_db_file}"')
         #
@@ -482,7 +482,7 @@ if __name__ == '__main__':
             if driver_item.device == dev:
                 lines_for_cmd.append(driver_item.config_line)
         else:
-            with open(object_cmd_file, 'w') as f:
+            with open(object_cmd_file, 'w', encoding="utf-8") as f:
                 f.writelines(lines_for_cmd)
                 print(f'写入cmd文件: "{object_cmd_file}"')
     if debug_level >= 1:

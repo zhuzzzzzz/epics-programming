@@ -585,15 +585,15 @@ if __name__ == "__main__":
             lines_for_db.extend(pv_item.gen_db_lines())
             lines_for_proto.append(pv_item.gen_proto_lines())
         else:
-            with open(object_db_file, "w") as f:
+            with open(object_db_file, "w", encoding="utf-8") as f:
                 f.writelines(drv.common_db_lines)
                 f.writelines(lines_for_db)
                 print(f'写入db文件: "{object_db_file}"')
-            with open(object_protocol_file, "w") as f:
+            with open(object_protocol_file, "w", encoding="utf-8") as f:
                 f.writelines(lines_for_proto)
                 print(f'写入protocol文件: "{object_protocol_file}"')
         #
-        with open(object_cmd_file, "w") as f:
+        with open(object_cmd_file, "w", encoding="utf-8") as f:
             f.writelines(drv.config_lines)
             print(f'写入cmd文件: "{object_cmd_file}"')
     if debug_level >= 1:
