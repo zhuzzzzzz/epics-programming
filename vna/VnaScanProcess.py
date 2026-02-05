@@ -1,5 +1,5 @@
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 import argparse
 import pyvisa
 from epics import PV, poll
@@ -292,9 +292,9 @@ if __name__ == "__main__":
     measure_wait = 1.0
     # 参数校验
     if (
-        sweep_settings[0] <= -10
-        or sweep_settings[1] >= 10
-        or sweep_settings[1] <= sweep_settings[0]
+        sweep_settings[0] <= -7
+        or sweep_settings[1] >= 7
+        or sweep_settings[1] < sweep_settings[0]
     ):
         print("error: Invalid sweep settings.")
         exit(1)
