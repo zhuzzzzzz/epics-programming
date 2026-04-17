@@ -1,15 +1,10 @@
 import time
 import logging
-import threading
 import gxipy as gx
 from epics_device import EpicsDevice
-from PIL import Image
 
 
 logger = logging.getLogger(__name__)
-
-
-image_store = None
 
 
 class CameraDeviceDH(EpicsDevice):
@@ -35,16 +30,19 @@ class CameraDeviceDH(EpicsDevice):
             "asyn": True,
         },
         "Trigger": {
-            "type": "enum",
-            "enums": ["Software", "Line0", "Line1", "Line2", "Line3"],
+            "type": "string",
             "asyn": True,
         },
-        "IMG": {
+        "IMAGE": {
             "type": "char",
             "asyn": True,
             "count": 1280 * 1024,
         },
-        "frame-id": {
+        "TriggerS": {
+            "type": "int",
+            "asyn": True,
+        },
+        "FrameID": {
             "type": "int",
             "asyn": True,
         },
@@ -73,10 +71,11 @@ class CameraDeviceDH(EpicsDevice):
     ]
     ATTR_EXEC_ALLOW_LIST = [
         "Trigger",
+        "TriggerS",
     ]
     ATTR_RESERVE_LIST = [
-        "IMG",
-        "frame-id",
+        "IMAGE",
+        "FrameID",
     ]
 
     def __new__(cls, *args, **kwargs):
@@ -90,9 +89,6 @@ class CameraDeviceDH(EpicsDevice):
         super().__init__(device_name, device_addr)
         #
         self.verbose = verbose  # 控制是否输出关于异常的详细日志
-        self._write_lock = {
-            item: threading.Lock() for item in self.ATTR_WRITE_ALLOW_LIST
-        }
         #
         self.connect()
 
@@ -195,6 +191,8 @@ class CameraDeviceDH(EpicsDevice):
         elif attr in self.ATTR_EXEC_ALLOW_LIST:
             if attr == "Trigger":
                 self.trigger()
+            elif attr == "TriggerS":
+                self.trigger_test(frame_rate=value)
             return None
         elif attr in self.ATTR_RESERVE_LIST:
             # no read or write
@@ -208,7 +206,7 @@ class CameraDeviceDH(EpicsDevice):
             return None
 
     def trigger(self):
-        logger.info("send software trigger command")
+        logger.debug("send software trigger command")
         try:
             self.camera.TriggerSoftware.send_command()
         except Exception as e:
@@ -217,32 +215,44 @@ class CameraDeviceDH(EpicsDevice):
             else:
                 logger.error(f"trigger failed: {e}")
 
+    def trigger_test(self, frame_rate, test_duration=10):
+        logger.info("start frame rate test")
+        trigger_num = frame_rate * test_duration
+        start_frame = self.device_driver.getParam("FrameID")
+        start_time = time.perf_counter()
+        for i in range(trigger_num):
+            logger.debug(f"frame test: trigger number {i}")
+            self.trigger()
+            time.sleep(1 / frame_rate)
+        logger.info("end frame rate test")
+        end_time = time.perf_counter()
+        end_frame = self.device_driver.getParam("FrameID")
+        logger.info(
+            f"frame test finished: total frames {end_frame - start_frame}, frame rate {(end_frame - start_frame) / (end_time - start_time)}"
+        )
+
 
 camera_device_dh = CameraDeviceDH("", "")
 
 
 def handle_image_CameraDeviceDH(raw_image):
-    logger.info(
+    logger.debug(
         "Frame ID: %d   Height: %d   Width: %d"
         % (raw_image.get_frame_id(), raw_image.get_height(), raw_image.get_width())
     )
     # create numpy array with data from raw image
     numpy_image = raw_image.get_numpy_array()
     if numpy_image is None:
-        print("Failed to get numpy array from RawImage")
+        logger.warning("Failed to get numpy array from RawImage")
         return
-    print(numpy_image)
-
-    # show acquired image
-    # img = Image.fromarray(numpy_image, "L")
-    # img.show()
+    logger.debug(f"Frame Content: \n{numpy_image}")
 
     if hasattr(camera_device_dh, "device_driver"):
         if hasattr(camera_device_dh.device_driver, "set_pv_value"):
             camera_device_dh.device_driver.set_pv_value(
-                "frame-id", raw_image.get_frame_id()
+                "FrameID", raw_image.get_frame_id()
             )
-            camera_device_dh.device_driver.set_pv_value("IMG", numpy_image.flatten())
+            camera_device_dh.device_driver.set_pv_value("IMAGE", numpy_image.flatten())
 
 
 if __name__ == "__main__":
