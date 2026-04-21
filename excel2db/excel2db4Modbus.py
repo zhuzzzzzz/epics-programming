@@ -310,12 +310,25 @@ def get_excel_list(file_path='./Modbus2db.xlsx', sheet_name='WorkArea', verbosit
             excel_list_not_empty_row.append(line)
     excel_list = excel_list_not_empty_row
 
-    if verbosity >= 2:
-        for line_list in excel_list:
-            for item in line_list:
-                print(item, end=' ')
-            else:
-                print('')
+    if verbosity >= 3:
+
+        header = excel_list[0]
+        header = [item.split('\n')[0].strip() if isinstance(item, str) else "None" for item in header]
+        contents = excel_list[1:]
+
+        # from tabulate import tabulate
+        # print(tabulate(contents, headers=header, tablefmt="grid"))
+
+        from rich.table import Table
+        from rich.console import Console
+
+        table = Table(show_lines=True)
+        for h in header:
+            table.add_column(h)
+        for row in contents:
+            table.add_row(*[str(x) if isinstance(x, str) else "None" for x in row])
+
+        Console().print(table)
 
     return excel_list
 
@@ -360,7 +373,7 @@ def handle_excel_list(excel_list):
                 pv_temp.modbus_funcode = excel_list[j][i]
             elif 'Address' in pv_title[i]:
                 memory_address = excel_list[j][i]
-                if not memory_address:
+                if not memory_address and not isinstance(memory_address, int):
                     print(f'错误: 表格第{line_number}行未配置PV地址')
                     exit(1)
                 pv_temp.memory_address = memory_address
@@ -436,7 +449,8 @@ if __name__ == '__main__':
             debug_level = item.count('v')
             break
     if debug_level >= 1:
-        print(' '.join(sys.argv), '\t', f'debug_level={debug_level}')
+        print(' '.join(sys.argv))
+        print(f'debug_level={debug_level}')
     if len(sys.argv) < 2 or len(sys.argv) > 3:
         print(f'Usage:\n'
               f'python {os.path.basename(sys.argv[0])} "excel file"\n'
@@ -485,7 +499,12 @@ if __name__ == '__main__':
             with open(object_cmd_file, 'w', encoding="utf-8") as f:
                 f.writelines(lines_for_cmd)
                 print(f'写入cmd文件: "{object_cmd_file}"')
+    if debug_level >= 3:
+        sys.exit(0)
     if debug_level >= 1:
-        print(device_pv_list_dict)
-        print(DeviceRegistered)
-        print(DriverRegistered)
+        from pprint import pprint
+        pprint(DeviceRegistered, indent=2)
+        pprint(DriverRegistered, indent=2)
+    if debug_level >= 2:
+        pprint(device_pv_list_dict, indent=2)
+
