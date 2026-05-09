@@ -1,13 +1,15 @@
 import logging
+import threading
 from pprint import pprint
 from typing import Any, Optional
 from abc import ABC, abstractmethod
 
 
-logger = logging.getLogger(__name__)
-
-
 class EpicsDevice(ABC):
+
+    _instance = {}
+    connect_lock = threading.Lock()  # 连接操作的过程锁
+    is_running = False
 
     PV_Prefix = ""
     PV_DB = {}
@@ -35,6 +37,11 @@ class EpicsDevice(ABC):
     # 1. 不建议使用 scan 字段
     # 2. 建议都使用 asyn 字段
 
+    def __new__(cls, *args, **kwargs):
+        if cls not in cls._instance:
+            cls._instance[cls] = super().__new__(cls)
+        return cls._instance[cls]
+
     def __init__(self, device_name, device_addr):
         self.PV_Prefix = device_name
         self.device_name = device_name
@@ -57,6 +64,10 @@ class EpicsDevice(ABC):
 
     @abstractmethod
     def is_connected(self) -> bool:
+        pass
+
+    @abstractmethod
+    def handle_disconnect(self) -> None:
         pass
 
     @abstractmethod
