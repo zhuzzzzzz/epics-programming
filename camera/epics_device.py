@@ -32,11 +32,16 @@ class EpicsDevice(ABC):
         pprint(self.PV_DB)
 
     @abstractmethod
-    def connect(self) -> None:
+    def connect(self) -> bool:
+        """
+        Returns:
+            True if connecting operation succeeded.
+            False if connecting operation failed.
+        """
         pass
 
-    def reconnect(self) -> None:
-        self.connect()
+    def reconnect(self) -> bool:
+        return self.connect()
 
     @abstractmethod
     def is_connected(self) -> bool:

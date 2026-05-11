@@ -145,10 +145,8 @@ class IOCDriver(Driver):
             # reconnection loop
             while True:
                 logger.info(f"try reconnecting")
-                try:
-                    self._device.reconnect()
-                except Exception as e:
-                    logger.error(f"reconnect failed: {e}")
+                if not self._device.reconnect():
+                    logger.error(f"reconnecting failed")
                     time.sleep(self.reconnect_interval)
                     continue
                 time.sleep(1)

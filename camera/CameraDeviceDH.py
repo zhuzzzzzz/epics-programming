@@ -22,6 +22,18 @@ THREAD_NUM = 1
 QUEUE_SIZE = 3
 
 
+class IOC_STATUS:
+    CLOSED = 0
+    RUNNING = 1
+    ERROR = 2
+    STARTING = 3
+    CLOSING = 4
+
+    @staticmethod
+    def enum_list():
+        return ["CLOSED", "RUNNING", "ERROR", "STARTING", "CLOSING"]
+
+
 class CameraDeviceDH(EpicsDevice):
 
     PV_Prefix = ""
@@ -61,10 +73,25 @@ class CameraDeviceDH(EpicsDevice):
             "asyn": True,
             "count": ROI_HEIGHT * ROI_WIDTH,
         },
-        "PIXEL_LENGTH": {
+        "ROI_WIDTH": {
+            "type": "int",
+            "asyn": True,
+            "value": ROI_WIDTH,
+        },
+        "ROI_HEIGHT": {
+            "type": "int",
+            "asyn": True,
+            "value": ROI_HEIGHT,
+        },
+        "X_PIXEL_LENGTH": {
             "type": "float",
             "asyn": True,
-            "value": 0.01,
+            "value": 1,
+        },
+        "Y_PIXEL_LENGTH": {
+            "type": "float",
+            "asyn": True,
+            "value": 1,
         },
         "ROI_X_START": {
             "type": "int",
@@ -140,7 +167,7 @@ class CameraDeviceDH(EpicsDevice):
         },
         "CCD_STATUS": {
             "type": "enum",
-            "enums": ["CLOSED", "RUNNING", "ERROR"],
+            "enums": IOC_STATUS.enum_list(),
             "asyn": True,
         },
         "CCD_CTRL": {
@@ -180,7 +207,10 @@ class CameraDeviceDH(EpicsDevice):
     ATTR_RESERVE_LIST = [
         "IMAGE",
         "ROI_IMAGE",
-        "PIXEL_LENGTH",
+        "ROI_WIDTH",
+        "ROI_HEIGHT",
+        "X_PIXEL_LENGTH",
+        "Y_PIXEL_LENGTH",
         "ROI_X_START",
         "ROI_Y_START",
         "ROI_X_DATA",
@@ -223,34 +253,48 @@ class CameraDeviceDH(EpicsDevice):
     def connect(self):
         if not hasattr(self, "device_driver") or self.device_driver is None:
             logger.error(f"can not connect before the device driver is initialized")
-            return
+            return False
         with self.connect_lock:
             if self.is_running:
-                return
-            logger.info(f'connecting to camera "{self.device_name}@{self.device_addr}"')
-            if hasattr(self, "device_manager"):
-                logger.debug("delete device manager")
-                del self.device_manager
-                time.sleep(3)
-            logger.debug("create device manager")
-            self.device_manager = gx.DeviceManager()
-            self.device_manager.update_device_list()
-            logger.info("opening camera device")
-            self.camera = self.device_manager.open_device_by_ip(self.device_addr)
-            self.data_stream = self.camera.data_stream[0]
-            logger.info("register capture callback")
-            logger.info('set "TriggerMode" to gx.GxSwitchEntry.ON')
-            self.camera.TriggerMode.set(gx.GxSwitchEntry.ON)
-            # self.camera.TriggerSource.set(gx.GxTriggerSourceEntry.SOFTWARE)
-            self.data_stream.register_capture_callback(handle_image_CameraDeviceDH)
-            logger.info("camera stream on")
-            self.camera.stream_on()
-            logger.info("camera device ready")
-            self.device_driver.set_pv_value("CCD_STATUS", 1)
-            self.is_running = True
+                self.device_driver.set_pv_value("CCD_STATUS", IOC_STATUS.RUNNING)
+                return True
+            self.device_driver.set_pv_value("CCD_STATUS", IOC_STATUS.STARTING)
+            try:
+                logger.info(
+                    f'connecting to camera "{self.device_name}@{self.device_addr}"'
+                )
+                if hasattr(self, "device_manager"):
+                    logger.debug("delete device manager")
+                    del self.device_manager
+                    time.sleep(3)
+                logger.debug("create device manager")
+                self.device_manager = gx.DeviceManager()
+                self.device_manager.update_device_list()
+                logger.info("opening camera device")
+                self.camera = self.device_manager.open_device_by_ip(self.device_addr)
+                self.data_stream = self.camera.data_stream[0]
+                logger.info("register capture callback")
+                logger.info('set "TriggerMode" to gx.GxSwitchEntry.ON')
+                self.camera.TriggerMode.set(gx.GxSwitchEntry.ON)
+                # self.camera.TriggerSource.set(gx.GxTriggerSourceEntry.SOFTWARE)
+                self.data_stream.register_capture_callback(handle_image_CameraDeviceDH)
+                logger.info("camera stream on")
+                self.camera.stream_on()
+                logger.info("camera device ready")
+            except Exception as e:
+                if self.verbose:
+                    logger.exception("failed connecting camera")
+                else:
+                    logger.error(f"failed connecting camera: {e}")
+                self.device_driver.set_pv_value("CCD_STATUS", IOC_STATUS.ERROR)
+                return False
+            else:
+                self.device_driver.set_pv_value("CCD_STATUS", IOC_STATUS.RUNNING)
+                self.is_running = True
+                return True
 
     def reconnect(self):
-        self.connect()
+        return self.connect()
 
     def is_connected(self):
         try:
@@ -262,12 +306,13 @@ class CameraDeviceDH(EpicsDevice):
 
     def handle_disconnection(self):
         self.is_running = False
-        self.device_driver.set_pv_value("CCD_STATUS", 2)
+        self.device_driver.set_pv_value("CCD_STATUS", IOC_STATUS.ERROR)
 
     def close(self):
         with self.connect_lock:
             if not self.is_running:
                 return
+            self.device_driver.set_pv_value("CCD_STATUS", IOC_STATUS.CLOSING)
             self.is_running = False
             logger.info("send close signal")
             time.sleep(3)
@@ -286,9 +331,10 @@ class CameraDeviceDH(EpicsDevice):
                     logger.exception("close camera failed")
                 else:
                     logger.error(f"close camera failed: {e}")
+                self.device_driver.set_pv_value("CCD_STATUS", IOC_STATUS.ERROR)
             else:
                 logger.info("camera device closed")
-                self.device_driver.set_pv_value("CCD_STATUS", 0)
+                self.device_driver.set_pv_value("CCD_STATUS", IOC_STATUS.CLOSED)
 
     def get_attr(self, attr):
         val = None
@@ -354,14 +400,15 @@ class CameraDeviceDH(EpicsDevice):
                 except Exception as e:
                     if self.verbose:
                         if value == 0:
-                            logger.exception(f'CCD_CTRL STOP failed')
+                            logger.exception(f"CCD_CTRL STOP failed")
                         elif value == 1:
-                            logger.exception(f'CCD_CTRL START failed')
+                            logger.exception(f"CCD_CTRL START failed")
                     else:
                         if value == 0:
-                            logger.warning(f'CCD_CTRL STOP failed: {e}')
+                            logger.warning(f"CCD_CTRL STOP failed: {e}")
                         elif value == 1:
-                            logger.warning(f'CCD_CTRL START failed: {e}')
+                            logger.warning(f"CCD_CTRL START failed: {e}")
+                    self.handle_disconnection()
                     return False
             return None
         elif attr in self.ATTR_RESERVE_LIST:
@@ -379,7 +426,7 @@ class CameraDeviceDH(EpicsDevice):
                 else:
                     # return None to let callback function handle it
                     return None
-            if attr == "PIXEL_LENGTH":
+            if attr == "X_PIXEL_LENGTH" or attr == "Y_PIXEL_LENGTH":
                 return None
             # no read or write
             logger.warning(f'set_attr failed: "{attr}" is reserved')
@@ -599,7 +646,8 @@ def process_frame(numpy_image, frame_id):
         roi_x_axis = np.arange(roi_x_start, roi_x_start + ROI_WIDTH)
         roi_y_axis = np.arange(roi_y_start, roi_y_start + ROI_HEIGHT)
 
-        pixel_length = camera_device_dh.device_driver.getParam("PIXEL_LENGTH")
+        x_pixel_length = camera_device_dh.device_driver.getParam("X_PIXEL_LENGTH")
+        y_pixel_length = camera_device_dh.device_driver.getParam("Y_PIXEL_LENGTH")
 
         roi_image = numpy_image[
             roi_y_start : roi_y_start + ROI_HEIGHT,
@@ -679,13 +727,13 @@ def process_frame(numpy_image, frame_id):
             camera_device_dh.device_driver.setParam("ROI_X_FIT_MAX", max_x)
             camera_device_dh.device_driver.setParam("ROI_X_FIT_POS", pos_x)
             camera_device_dh.device_driver.setParam(
-                "ROI_X_FIT_POS_LEN", pos_x * pixel_length
+                "ROI_X_FIT_POS_LEN", pos_x * x_pixel_length
             )
             camera_device_dh.device_driver.setParam("ROI_X_FIT_SIGMA", sigma_x)
             camera_device_dh.device_driver.setParam("ROI_Y_FIT_MAX", max_y)
             camera_device_dh.device_driver.setParam("ROI_Y_FIT_POS", pos_y)
             camera_device_dh.device_driver.setParam(
-                "ROI_Y_FIT_POS_LEN", pos_y * pixel_length
+                "ROI_Y_FIT_POS_LEN", pos_y * y_pixel_length
             )
             camera_device_dh.device_driver.setParam("ROI_Y_FIT_SIGMA", sigma_y)
             camera_device_dh.device_driver.updatePVs()
