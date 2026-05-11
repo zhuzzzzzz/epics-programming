@@ -1,4 +1,3 @@
-import logging
 import threading
 from pprint import pprint
 from typing import Any, Optional
@@ -8,34 +7,12 @@ from abc import ABC, abstractmethod
 class EpicsDevice(ABC):
 
     _instance = {}
+
     connect_lock = threading.Lock()  # 连接操作的过程锁
     is_running = False
 
     PV_Prefix = ""
     PV_DB = {}
-    # PV_DB Example:
-    # PV_DB = {
-    #     "DeviceTemperature": {
-    #         "type": "float",
-    #         "asyn": True,
-    #     },
-    #     "ExposureTime": {
-    #         "type": "float",
-    #         "asyn": True,
-    #     },
-    #     "Gain": {
-    #         "type": "float",
-    #         "asyn": True,
-    #     },
-    #     "TriggerSource": {
-    #         "type": "enum",
-    #         "enums": ["Software", "Line0", "Line1", "Line2", "Line3"],
-    #         "asyn": True,
-    #     },
-    # }
-    # 注意事项:
-    # 1. 不建议使用 scan 字段
-    # 2. 建议都使用 asyn 字段
 
     def __new__(cls, *args, **kwargs):
         if cls not in cls._instance:
@@ -53,7 +30,6 @@ class EpicsDevice(ABC):
 
     def list_pvs(self) -> None:
         pprint(self.PV_DB)
-        # pprint(self.PV_DB, compact=True)
 
     @abstractmethod
     def connect(self) -> None:
@@ -67,7 +43,7 @@ class EpicsDevice(ABC):
         pass
 
     @abstractmethod
-    def handle_disconnect(self) -> None:
+    def handle_disconnection(self) -> None:
         pass
 
     @abstractmethod
@@ -83,7 +59,7 @@ class EpicsDevice(ABC):
             attr: attribute name
 
         Returns:
-            Retrieved attribute value.
+            Retrieved attribute value from hardware device.
             None if retrieve failed.
         """
         pass
@@ -91,7 +67,7 @@ class EpicsDevice(ABC):
     @abstractmethod
     def set_attr(self, attr: str, value: Any) -> Optional[bool]:
         """
-        Set attribute value to device.
+        Set attribute value to hardware device.
 
         Args:
             attr: attribute name
@@ -100,6 +76,6 @@ class EpicsDevice(ABC):
         Returns:
             True if set attribute value success.
             False if set failed.
-            None if attribute is not supported
+            None if attribute is not supported.
         """
         pass

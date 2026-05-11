@@ -260,15 +260,9 @@ class CameraDeviceDH(EpicsDevice):
         else:
             return True
 
-    def handle_disconnect(self):
-        if not self.connect_lock.acquire(blocking=False):
-            logger.warning("get connect lock failed, skip handle_disconnect")
-            return
-        try:
-            self.is_running = False
-            self.device_driver.set_pv_value("CCD_STATUS", 2)
-        finally:
-            self.connect_lock.release()
+    def handle_disconnection(self):
+        self.is_running = False
+        self.device_driver.set_pv_value("CCD_STATUS", 2)
 
     def close(self):
         with self.connect_lock:
@@ -317,6 +311,11 @@ class CameraDeviceDH(EpicsDevice):
         return None
 
     def set_attr(self, attr, value):
+        if attr in self.ATTR_WRITE_ALLOW_LIST and not self.is_running:
+            logger.warning(
+                f'set_attr failed(set "{attr}" to {repr(value)}): device is not running'
+            )
+            return False
         if attr in self.ATTR_WRITE_ALLOW_LIST:
             if hasattr(self.camera, attr):
                 if attr in self.ATTR_WRITE_ALLOW_LIST:
@@ -340,17 +339,30 @@ class CameraDeviceDH(EpicsDevice):
                 logger.error(
                     f'set_attr failed: "{attr}" is not an attribute of "{self.__class__.__name__}"'
                 )
-                return True
+                return False
         elif attr in self.ATTR_EXEC_ALLOW_LIST:
             if attr == "TRIGGER":
                 self.trigger()
             elif attr == "TRIGGER_S":
                 self.trigger_test(frame_rate=value)
             elif attr == "CCD_CTRL":
-                if value == 0:
-                    self.close()
-                elif value == 1:
-                    self.connect()
+                try:
+                    if value == 0:
+                        self.close()
+                    elif value == 1:
+                        self.connect()
+                except Exception as e:
+                    if self.verbose:
+                        if value == 0:
+                            logger.exception(f'CCD_CTRL STOP failed')
+                        elif value == 1:
+                            logger.exception(f'CCD_CTRL START failed')
+                    else:
+                        if value == 0:
+                            logger.warning(f'CCD_CTRL STOP failed: {e}')
+                        elif value == 1:
+                            logger.warning(f'CCD_CTRL START failed: {e}')
+                    return False
             return None
         elif attr in self.ATTR_RESERVE_LIST:
             if attr == "ROI_X_START":

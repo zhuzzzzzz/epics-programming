@@ -26,7 +26,6 @@ class IOCDriver(Driver):
         self._update_thread = threading.Thread(target=self._update_loop, daemon=True)
         self._lock = threading.Lock()
         self._write_lock = {}
-        self._status_normal = True
         self.update_interval = update_interval
         self.detect_interval = detect_interval
         self.reconnect_interval = reconnect_interval
@@ -116,6 +115,21 @@ class IOCDriver(Driver):
             # write operation not supported, may be a soft PV, update as normal
             self.set_pv_value(reason, value, lock=lock)
 
+    def _set_all_invalid(self):
+        logger.warning("set all PVs invalid")
+        for pv_base in self._device.PV_DB.keys():
+            reason = pv_base
+            with self._lock:
+                lock_temp = self._write_lock.setdefault(reason, threading.Lock())
+            with lock_temp:
+                self.setParamStatus(
+                    reason,
+                    alarm=Alarm.LINK_ALARM,
+                    severity=Severity.INVALID_ALARM,
+                )
+        else:
+            self.updatePVs()
+
     def _process_loop(self):
         while True:
             # detection loop
@@ -124,29 +138,31 @@ class IOCDriver(Driver):
                 if self._device.is_running and not self._device.is_connected():
                     logger.error(f"device disconnection detected")
                     self._set_all_invalid()
-                    self._device.handle_disconnect()
+                    self._device.handle_disconnection()
                     break
                 else:
                     time.sleep(self.detect_interval)
             # reconnection loop
             while True:
-                logger.warning(f"try reconnecting")
+                logger.info(f"try reconnecting")
                 try:
                     self._device.reconnect()
                 except Exception as e:
                     logger.error(f"reconnect failed: {e}")
                     time.sleep(self.reconnect_interval)
                     continue
+                time.sleep(1)
                 if self._device.is_connected():
                     logger.info(f"device reconnected")
                     break
                 else:
                     logger.warning(f"device still disconnected")
+                    time.sleep(self.reconnect_interval)
 
     def _update_loop(self):
         while True:
             if not self._device.is_running:
-                logger.debug("update loop stopped as in device not in running status")
+                logger.debug("update loop stopped as device is not running")
                 time.sleep(self.update_interval)
                 continue
             logger.debug(f"updating all PVs from device")
@@ -166,18 +182,3 @@ class IOCDriver(Driver):
                     self.updatePVs()
             finally:
                 time.sleep(self.update_interval)
-
-    def _set_all_invalid(self):
-        logger.warning("set all PVs invalid")
-        for pv_base in self._device.PV_DB.keys():
-            reason = pv_base
-            with self._lock:
-                lock_temp = self._write_lock.setdefault(reason, threading.Lock())
-            with lock_temp:
-                self.setParamStatus(
-                    pv_base,
-                    alarm=Alarm.LINK_ALARM,
-                    severity=Severity.INVALID_ALARM,
-                )
-        else:
-            self.updatePVs()
