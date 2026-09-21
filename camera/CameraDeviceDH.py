@@ -298,7 +298,7 @@ class CameraDeviceDH(EpicsDevice):
 
     def is_connected(self):
         try:
-            self.camera.DeviceTemperature.get()
+            self.camera.Height.get()
         except Exception:
             return False
         else:
