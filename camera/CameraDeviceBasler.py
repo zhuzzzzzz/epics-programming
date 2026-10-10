@@ -210,8 +210,8 @@ class CameraDeviceBasler(EpicsDevice):
         },
     }
 
-    # 允许直接向设备读取的属性值
-    ATTR_READ_ALLOW_LIST = [
+    # 直接向设备读取的属性值
+    ATTR_READ_LIST = [
         "DeviceTemperature",
         "ExposureTime",
         "Gain",
@@ -219,19 +219,19 @@ class CameraDeviceBasler(EpicsDevice):
         "Width",
         "Height",
     ]
-    # 允许直接向设备写入的属性值
-    ATTR_WRITE_ALLOW_LIST = [
+    # 直接向设备写入的属性值
+    ATTR_WRITE_LIST = [
         "ExposureTime",
         "Gain",
         "TriggerSource",
     ]
-    # 允许执行操作的属性值
-    ATTR_EXEC_ALLOW_LIST = [
+    # 执行软件逻辑的属性值
+    ATTR_EXEC_LIST = [
         "TRIGGER",
         "TRIGGER_S",
         "CCD_CTRL",
     ]
-    # 保留的属性值(不对设备进行操作)
+    # 软件逻辑保留的属性值(与设备无关)
     ATTR_RESERVE_LIST = [
         "IMAGE",
         "ROI_IMAGE",
@@ -357,7 +357,7 @@ class CameraDeviceBasler(EpicsDevice):
 
     def get_attr(self, attr):
         val = None
-        if attr in self.ATTR_READ_ALLOW_LIST:
+        if attr in self.ATTR_READ_LIST:
             try:
                 if hasattr(self.camera, attr):
                     handler = getattr(self.camera, attr)
@@ -377,12 +377,12 @@ class CameraDeviceBasler(EpicsDevice):
         return None
 
     def set_attr(self, attr, value):
-        if attr in self.ATTR_WRITE_ALLOW_LIST and not self.is_running:
+        if attr in self.ATTR_WRITE_LIST and not self.is_running:
             logger.warning(
                 f'set_attr failed(set "{attr}" to {repr(value)}): device is not running'
             )
             return False
-        if attr in self.ATTR_WRITE_ALLOW_LIST:
+        if attr in self.ATTR_WRITE_LIST:
             try:
                 if hasattr(self.camera, attr):
                     handler = getattr(self.camera, attr)
@@ -401,7 +401,7 @@ class CameraDeviceBasler(EpicsDevice):
             else:
                 logger.info(f'set "{attr}" to {repr(value)}')
                 return True
-        elif attr in self.ATTR_EXEC_ALLOW_LIST:
+        elif attr in self.ATTR_EXEC_LIST:
             if attr == "TRIGGER":
                 self.trigger()
             elif attr == "TRIGGER_S":
@@ -446,7 +446,7 @@ class CameraDeviceBasler(EpicsDevice):
             # no read or write
             logger.warning(f'set_attr failed: "{attr}" is reserved')
             return False
-        elif attr in self.ATTR_READ_ALLOW_LIST:
+        elif attr in self.ATTR_READ_LIST:
             # can read but can't write
             logger.warning(f'set_attr failed: "{attr}" is read-only')
             return False
@@ -522,12 +522,23 @@ class CameraDeviceBasler(EpicsDevice):
                         if grab_result.GrabSucceeded():
                             numpy_image = grab_result.Array
                             frame_id = grab_result.GetImageNumber()
+                            logger.debug(
+                                "grab_loop get good frame: ID=%d Height=%d Width=%d"
+                                % (
+                                    frame_id,
+                                    numpy_image.shape[0],
+                                    numpy_image.shape[1],
+                                )
+                            )
                             try:
                                 handle_queue.put_nowait((numpy_image, frame_id))
                             except queue.Full:
                                 logger.info("drop frame : ID=%d" % frame_id)
                         else:
-                            logger.info("grab failed:", grab_result.ErrorDescription)
+                            logger.info(
+                                "grab_loop get bad frame: %s"
+                                % grab_result.ErrorDescription
+                            )
                 except pylon.TimeoutException:
                     logger.debug("grab timeout")
                 except Exception as e:
@@ -646,21 +657,6 @@ fit_stat = create_time_stat("Gaussian Fit Time")
 update_stat = create_time_stat("PV Update Time")
 handle_stat = create_time_stat("Process Frame Time")
 result_stat = create_string_stat("Result Stat")
-
-
-def handle_image_CameraDeviceBasler(raw_image):
-    logger.debug(
-        "callback get frame: ID=%d Height=%d Width=%d"
-        % (raw_image.get_frame_id(), raw_image.get_height(), raw_image.get_width())
-    )
-    # create numpy array with data from raw image
-    numpy_image = raw_image.get_numpy_array()
-    numpy_image = numpy_image.copy()
-    frame_id = raw_image.get_frame_id()
-    try:
-        handle_queue.put_nowait((numpy_image, frame_id))
-    except queue.Full:
-        logger.info("drop frame : ID=%d" % frame_id)
 
 
 def process_queue_loop():

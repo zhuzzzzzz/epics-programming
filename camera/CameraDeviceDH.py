@@ -175,14 +175,10 @@ class CameraDeviceDH(EpicsDevice):
             "enums": ["STOP", "START"],
             "asyn": True,
         },
-        "CCD_IOC_RESTART": {
-            "type": "string",
-            "asyn": True,
-        },
     }
 
-    # 允许直接向设备读取的属性值
-    ATTR_READ_ALLOW_LIST = [
+    # 直接向设备读取的属性值
+    ATTR_READ_LIST = [
         "DeviceTemperature",
         "ExposureTime",
         "Gain",
@@ -190,20 +186,19 @@ class CameraDeviceDH(EpicsDevice):
         "Width",
         "Height",
     ]
-    # 允许直接向设备写入的属性值
-    ATTR_WRITE_ALLOW_LIST = [
+    # 直接向设备写入的属性值
+    ATTR_WRITE_LIST = [
         "ExposureTime",
         "Gain",
         "TriggerSource",
     ]
-    # 允许执行操作的属性值
-    ATTR_EXEC_ALLOW_LIST = [
+    # 执行软件逻辑的属性值
+    ATTR_EXEC_LIST = [
         "TRIGGER",
         "TRIGGER_S",
         "CCD_CTRL",
-        "CCD_IOC_RESTART",
     ]
-    # 保留的属性值(不对设备进行操作)
+    # 软件逻辑保留的属性值(与设备无关)
     ATTR_RESERVE_LIST = [
         "IMAGE",
         "ROI_IMAGE",
@@ -336,7 +331,7 @@ class CameraDeviceDH(EpicsDevice):
 
     def get_attr(self, attr):
         val = None
-        if attr in self.ATTR_READ_ALLOW_LIST:
+        if attr in self.ATTR_READ_LIST:
             if hasattr(self.camera, attr):
                 handler = getattr(self.camera, attr)
                 try:
@@ -355,14 +350,14 @@ class CameraDeviceDH(EpicsDevice):
         return None
 
     def set_attr(self, attr, value):
-        if attr in self.ATTR_WRITE_ALLOW_LIST and not self.is_running:
+        if attr in self.ATTR_WRITE_LIST and not self.is_running:
             logger.warning(
                 f'set_attr failed(set "{attr}" to {repr(value)}): device is not running'
             )
             return False
-        if attr in self.ATTR_WRITE_ALLOW_LIST:
+        if attr in self.ATTR_WRITE_LIST:
             if hasattr(self.camera, attr):
-                if attr in self.ATTR_WRITE_ALLOW_LIST:
+                if attr in self.ATTR_WRITE_LIST:
                     handler = getattr(self.camera, attr)
                     try:
                         handler.set(value)
@@ -384,7 +379,7 @@ class CameraDeviceDH(EpicsDevice):
                     f'set_attr failed: "{attr}" is not an attribute of "{self.__class__.__name__}"'
                 )
                 return False
-        elif attr in self.ATTR_EXEC_ALLOW_LIST:
+        elif attr in self.ATTR_EXEC_LIST:
             if attr == "TRIGGER":
                 self.trigger()
             elif attr == "TRIGGER_S":
@@ -429,7 +424,7 @@ class CameraDeviceDH(EpicsDevice):
             # no read or write
             logger.warning(f'set_attr failed: "{attr}" is reserved')
             return False
-        elif attr in self.ATTR_READ_ALLOW_LIST:
+        elif attr in self.ATTR_READ_LIST:
             # can read but can't write
             logger.warning(f'set_attr failed: "{attr}" is read-only')
             return False

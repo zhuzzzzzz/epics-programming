@@ -17,7 +17,7 @@ class EpicsDevice(ABC):
     def __new__(cls, *args, **kwargs):
         if cls not in cls._instance:
             cls._instance[cls] = super().__new__(cls)
-        return cls._instance[cls]
+        return cls._instance[cls] # 返回类的单例实例
 
     def __init__(self, device_name):
         self.PV_Prefix = device_name
