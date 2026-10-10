@@ -235,8 +235,9 @@ class CameraDeviceDH(EpicsDevice):
     def __init__(self, device_name, device_addr, verbose=False):
         if not device_addr:
             return
-        super().__init__(device_name, device_addr)
+        super().__init__(device_name)
         #
+        self.device_addr = device_addr
         self.verbose = verbose  # 控制是否输出关于异常的详细日志
         self.process_queue_thread = [
             threading.Thread(
@@ -292,9 +293,6 @@ class CameraDeviceDH(EpicsDevice):
                 self.device_driver.set_pv_value("CCD_STATUS", IOC_STATUS.RUNNING)
                 self.is_running = True
                 return True
-
-    def reconnect(self):
-        return self.connect()
 
     def is_connected(self):
         try:

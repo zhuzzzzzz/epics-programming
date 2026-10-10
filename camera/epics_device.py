@@ -19,10 +19,9 @@ class EpicsDevice(ABC):
             cls._instance[cls] = super().__new__(cls)
         return cls._instance[cls]
 
-    def __init__(self, device_name, device_addr):
+    def __init__(self, device_name):
         self.PV_Prefix = device_name
         self.device_name = device_name
-        self.device_addr = device_addr
         self.device_driver = None  # 设备实例对驱动实例的反向引用, 由驱动实例注入, 使设备实例能够调用驱动实例的方法
 
     def __del__(self):

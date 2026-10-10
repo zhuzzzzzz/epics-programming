@@ -134,7 +134,7 @@ class IOCDriver(Driver):
         while True:
             # detection loop
             while True:
-                logger.debug("in detection loop")
+                logger.debug(f"in detection loop - (is_running: {self._device.is_running}, is_connected: {self._device.is_connected()})")
                 if self._device.is_running and not self._device.is_connected():
                     logger.error(f"device disconnection detected")
                     self._set_all_invalid()
@@ -145,6 +145,7 @@ class IOCDriver(Driver):
             # reconnection loop
             while True:
                 logger.info(f"try reconnecting")
+                logger.debug(f"is_running: {self._device.is_running}, is_connected: {self._device.is_connected()}")
                 if not self._device.reconnect():
                     logger.error(f"reconnecting failed")
                     time.sleep(self.reconnect_interval)
@@ -166,7 +167,6 @@ class IOCDriver(Driver):
             logger.debug(f"updating all PVs from device")
             try:
                 for pv_base in self._device.PV_DB.keys():
-                    logger.debug(f'update PV "{pv_base}"')
                     reason = pv_base
                     with self._lock:
                         lock_temp = self._write_lock.setdefault(
@@ -175,7 +175,10 @@ class IOCDriver(Driver):
                     with lock_temp:
                         value = self._device.get_attr(pv_base)
                         if value is not None:
+                            logger.debug(f'update PV "{pv_base}" with value: {value}(type: {type(value)})')
                             self.setParam(pv_base, value)
+                            # self.callbackPV(reason)
+                            # self.updatePV(pv_base)
                 else:
                     self.updatePVs()
             finally:
